@@ -1,0 +1,108 @@
+'use client';
+
+import React from 'react';
+import { Tile, Position } from '@/types/puzzle';
+
+interface PuzzleTileProps {
+  tile: Tile;
+  size: number;
+  tileSize: number;
+  imageUrl: string;
+  onClick: () => void;
+  onMouseDown?: (e: React.MouseEvent) => void;
+  onTouchStart?: (e: React.TouchEvent) => void;
+  isComplete: boolean;
+  isDragging?: boolean;
+  isSliding?: boolean;
+  isMovable?: boolean;
+  dragPosition?: { x: number; y: number } | null;
+  isSourceOfDrag?: boolean;
+}
+
+const PuzzleTile: React.FC<PuzzleTileProps> = ({ 
+  tile, 
+  size, 
+  tileSize,
+  imageUrl, 
+  onClick, 
+  onMouseDown,
+  onTouchStart,
+  isComplete, 
+  isDragging = false,
+  isSliding = false,
+  isMovable = false,
+  dragPosition = null,
+  isSourceOfDrag = false
+}) => {
+  const calculateBackgroundPosition = (position: Position): string => {
+    const x = -(position.col * tileSize);
+    const y = -(position.row * tileSize);
+    return `${x}px ${y}px`;
+  };
+
+  const isInCorrectPosition = 
+    tile.currentPosition.row === tile.correctPosition.row && 
+    tile.currentPosition.col === tile.correctPosition.col;
+
+  const getTileStyle = () => {
+    const baseStyle = {
+      width: `${tileSize}px`,
+      height: `${tileSize}px`,
+      backgroundImage: `url(${imageUrl})`,
+      backgroundSize: `${size * tileSize}px ${size * tileSize}px`,
+      backgroundPosition: calculateBackgroundPosition(tile.correctPosition),
+    };
+
+    if (isDragging && dragPosition) {
+      return {
+        ...baseStyle,
+        position: 'absolute' as const,
+        left: `${dragPosition.x}px`,
+        top: `${dragPosition.y}px`,
+        zIndex: 1000,
+        transform: 'scale(1.05)',
+        boxShadow: '0 10px 25px rgba(0, 0, 0, 0.3)',
+        transition: 'none',
+      };
+    }
+
+    if (isSliding) {
+      return {
+        ...baseStyle,
+        transition: 'all 0.3s ease-out',
+      };
+    }
+
+    return baseStyle;
+  };
+
+  return (
+    <div
+      className={`
+        relative rounded-md overflow-hidden
+        ${isComplete ? 'opacity-100' : ''}
+        ${isSourceOfDrag ? 'opacity-30' : ''}
+        ${isInCorrectPosition ? 'ring-[1px] ring-[#5FD39C]/70' : 'ring-[0.5px] ring-white/20'}
+        ${isMovable && !isDragging ? 'shadow-lg z-10 cursor-grab hover:scale-105' : 'opacity-90 cursor-not-allowed'}
+        ${isDragging ? 'cursor-grabbing' : ''}
+        ${isSliding ? 'transition-all duration-300 ease-out' : ''}
+      `}
+      style={getTileStyle()}
+      onClick={isMovable ? onClick : undefined}
+      onMouseDown={isMovable ? onMouseDown : undefined}
+      onTouchStart={isMovable ? onTouchStart : undefined}
+    >
+      {isDragging && (
+        <div className="absolute inset-0 bg-white/10 rounded-md flex items-center justify-center">
+          <div className="text-white/60 text-xs font-semibold">Dragging</div>
+        </div>
+      )}
+
+      {!isMovable && !isDragging && (
+        <div className="absolute inset-0 bg-black/5 rounded-md" />
+      )}
+    </div>
+  );
+};
+
+export default PuzzleTile; 

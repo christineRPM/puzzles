@@ -1,0 +1,458 @@
+'use client';
+
+import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
+import { Tile, Position, GameState, PuzzleSize } from '@/types/puzzle';
+import PuzzleTile from '@/components/PuzzleTile';
+import PuzzleControls from '@/components/PuzzleControls';
+import TwitterLoginButton from '@/components/TwitterLoginButton';
+import { shuffleTiles, isPuzzleComplete, getAdjacentPositions } from '@/utils/puzzleUtils';
+
+interface SlidingPuzzleProps {
+  size: PuzzleSize;
+  imageUrl: string;
+  onSizeChange: (size: PuzzleSize) => void;
+}
+
+
+const SlidingPuzzle: React.FC<SlidingPuzzleProps> = ({ size, imageUrl, onSizeChange }) => {
+  const [gameState, setGameState] = useState<GameState>({
+    tiles: [],
+    size,
+    isComplete: false,
+    moves: 0,
+    isShuffled: false,
+  });
+
+  const [startTime, setStartTime] = useState<number | null>(null);
+  const [currentTime, setCurrentTime] = useState<number>(0);
+  const [draggedTile, setDraggedTile] = useState<Tile | null>(null);
+  const [isDragging, setIsDragging] = useState(false);
+  const [dragPosition, setDragPosition] = useState({ x: 0, y: 0 });
+  const [slidingTiles, setSlidingTiles] = useState<Set<number>>(new Set());
+  const [movableTiles, setMovableTiles] = useState<Set<number>>(new Set());
+  const [emptyPosition, setEmptyPosition] = useState<Position>({ row: size - 1, col: size - 1 });
+  const [tileSize, setTileSize] = useState(76);
+  const boardRef = useRef<HTMLDivElement>(null);
+
+  const progress = useMemo(() => {
+    if (gameState.isComplete) return 100;
+    if (!gameState.isShuffled) return 0;
+
+    const correctTiles = gameState.tiles.filter(
+      (tile) =>
+        tile.currentPosition.row === tile.correctPosition.row &&
+        tile.currentPosition.col === tile.correctPosition.col
+    ).length;
+    
+    const totalMovableTiles = size * size - 1;
+    if (totalMovableTiles <= 0) return 0;
+
+    return (correctTiles / totalMovableTiles) * 100;
+  }, [gameState.tiles, gameState.isComplete, gameState.isShuffled, size]);
+
+  useEffect(() => {
+    const calculateTileSize = () => {
+      if (boardRef.current) {
+        const boardContainer = boardRef.current;
+        const computedStyle = getComputedStyle(boardContainer);
+        const containerWidth = boardContainer.offsetWidth;
+        const paddingX = parseFloat(computedStyle.paddingLeft) + parseFloat(computedStyle.paddingRight);
+        
+        const gap = 4;
+        
+        const contentWidth = containerWidth - paddingX;
+        const totalGapWidth = (size - 1) * gap;
+        const newTileSize = (contentWidth - totalGapWidth) / size;
+        
+        setTileSize(newTileSize);
+      }
+    };
+
+    let timeoutId: NodeJS.Timeout;
+    const debouncedHandler = () => {
+      clearTimeout(timeoutId);
+      timeoutId = setTimeout(calculateTileSize, 100);
+    };
+
+    calculateTileSize();
+    window.addEventListener('resize', debouncedHandler);
+
+    return () => {
+      window.removeEventListener('resize', debouncedHandler);
+      clearTimeout(timeoutId);
+    };
+  }, [size]);
+
+  const createSolvedTiles = useCallback((): Tile[] => {
+    const tiles: Tile[] = [];
+    const totalTiles = size * size - 1;
+    for (let i = 0; i < totalTiles; i++) {
+      const row = Math.floor(i / size);
+      const col = i % size;
+      tiles.push({
+        id: i,
+        currentPosition: { row, col },
+        correctPosition: { row, col }
+      });
+    }
+    return tiles;
+  }, [size]);
+
+  const initializePuzzle = useCallback(() => {
+    const tiles = createSolvedTiles();
+    setGameState({
+      tiles,
+      size,
+      isComplete: false,
+      moves: 0,
+      isShuffled: false,
+    });
+    setEmptyPosition({ row: size - 1, col: size - 1 });
+    setStartTime(null);
+    setCurrentTime(0);
+    setDraggedTile(null);
+    setIsDragging(false);
+    setSlidingTiles(new Set());
+    setMovableTiles(new Set());
+  }, [size, createSolvedTiles]);
+
+  const updateMovableTiles = useCallback(() => {
+    const adjacentPositions = getAdjacentPositions(emptyPosition, size);
+    const movable = new Set<number>();
+
+    gameState.tiles.forEach(tile => {
+      const isAdjacent = adjacentPositions.some(
+        pos => pos.row === tile.currentPosition.row && pos.col === tile.currentPosition.col
+      );
+      if (isAdjacent) {
+        movable.add(tile.id);
+      }
+    });
+
+    setMovableTiles(movable);
+  }, [gameState.tiles, emptyPosition, size]);
+
+  useEffect(() => {
+    initializePuzzle();
+  }, [initializePuzzle]);
+
+  useEffect(() => {
+    let interval: NodeJS.Timeout;
+    if (startTime && !gameState.isComplete) {
+      interval = setInterval(() => {
+        setCurrentTime(Date.now() - startTime);
+      }, 1000);
+    }
+    return () => clearInterval(interval);
+  }, [startTime, gameState.isComplete]);
+
+  useEffect(() => {
+    updateMovableTiles();
+  }, [updateMovableTiles]);
+
+  const shufflePuzzle = useCallback(async () => {
+    const initialEmpty = { row: size - 1, col: size - 1 };
+    const solvedTiles = createSolvedTiles();
+    const { tiles: shuffledTiles, emptyPosition: shuffledEmpty } = shuffleTiles(
+      solvedTiles,
+      size,
+      initialEmpty
+    );
+    
+    setGameState(prev => ({
+      ...prev,
+      tiles: shuffledTiles,
+      moves: 0,
+      isComplete: false,
+      isShuffled: true,
+    }));
+    setEmptyPosition(shuffledEmpty);
+    setStartTime(Date.now());
+  }, [size, createSolvedTiles]);
+
+  const animateSlide = useCallback((tile: Tile) => {
+    setSlidingTiles(prev => new Set([...prev, tile.id]));
+    
+    setTimeout(() => {
+      setSlidingTiles(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(tile.id);
+        return newSet;
+      });
+    }, 300);
+  }, []);
+
+  const moveTile = useCallback((tile: Tile) => {
+    if (gameState.isComplete) return;
+
+    const adjacentPositions = getAdjacentPositions(emptyPosition, size);
+    const isAdjacent = adjacentPositions.some(
+      (pos: Position) => pos.row === tile.currentPosition.row && pos.col === tile.currentPosition.col
+    );
+
+    if (!isAdjacent) return;
+
+    animateSlide(tile);
+
+    setGameState(prev => {
+      const updatedTiles = prev.tiles.map(t => {
+        if (t.id === tile.id) {
+          return { ...t, currentPosition: emptyPosition };
+        }
+        return t;
+      });
+
+      const isComplete = isPuzzleComplete(updatedTiles);
+      
+      return {
+        ...prev,
+        tiles: updatedTiles,
+        moves: prev.moves + 1,
+        isComplete,
+      };
+    });
+
+    setEmptyPosition(tile.currentPosition);
+  }, [gameState.isComplete, emptyPosition, size, animateSlide]);
+
+  useEffect(() => {
+    const preventScroll = (e: TouchEvent) => {
+      if (isDragging) {
+        e.preventDefault();
+      }
+    };
+
+    document.addEventListener('touchmove', preventScroll, { passive: false });
+    
+    return () => {
+      document.removeEventListener('touchmove', preventScroll);
+    };
+  }, [isDragging]);
+
+  const handleDragStart = useCallback((e: React.MouseEvent | React.TouchEvent, tile: Tile) => {
+    if (gameState.isComplete) return;
+    if (!movableTiles.has(tile.id)) return;
+
+    e.preventDefault();
+
+    setIsDragging(true);
+    setDraggedTile(tile);
+    
+    const boardRect = boardRef.current?.getBoundingClientRect();
+    if (!boardRect) return;
+
+    const originalX = tile.currentPosition.col * (tileSize + 4);
+    const originalY = tile.currentPosition.row * (tileSize + 4);
+    
+    setDragPosition({ x: originalX, y: originalY });
+  }, [gameState.isComplete, movableTiles, tileSize]);
+
+  const handleDragMove = useCallback((e: React.MouseEvent | React.TouchEvent) => {
+    if (!isDragging || !draggedTile || !boardRef.current) return;
+
+    const boardRect = boardRef.current.getBoundingClientRect();
+    
+    let clientX: number, clientY: number;
+    
+    if ('touches' in e) {
+      clientX = e.touches[0].clientX;
+      clientY = e.touches[0].clientY;
+    } else {
+      clientX = e.clientX;
+      clientY = e.clientY;
+    }
+
+    const mouseX = clientX - boardRect.left;
+    const mouseY = clientY - boardRect.top;
+
+    const newX = Math.max(0, Math.min(mouseX - tileSize / 2, boardRect.width - tileSize));
+    const newY = Math.max(0, Math.min(mouseY - tileSize / 2, boardRect.height - tileSize));
+
+    setDragPosition({ x: newX, y: newY });
+  }, [isDragging, draggedTile, tileSize]);
+
+  const handleDragEnd = useCallback(() => {
+    if (!isDragging || !draggedTile || !boardRef.current) return;
+
+    const gap = 4;
+    const emptyX = emptyPosition.col * (tileSize + gap);
+    const emptyY = emptyPosition.row * (tileSize + gap);
+
+    const distanceX = Math.abs(dragPosition.x - emptyX);
+    const distanceY = Math.abs(dragPosition.y - emptyY);
+    const threshold = tileSize * 0.6;
+
+    if (distanceX < threshold && distanceY < threshold) {
+      moveTile(draggedTile);
+    }
+
+    setIsDragging(false);
+    setDraggedTile(null);
+    setDragPosition({ x: 0, y: 0 });
+  }, [isDragging, draggedTile, emptyPosition, dragPosition, moveTile, tileSize]);
+
+  const resetPuzzle = useCallback(() => {
+    initializePuzzle();
+  }, [initializePuzzle]);
+
+  const formatTime = (ms: number): string => {
+    const seconds = Math.floor(ms / 1000);
+    const minutes = Math.floor(seconds / 60);
+    const remainingSeconds = seconds % 60;
+    return `${minutes.toString().padStart(2, '0')}:${remainingSeconds.toString().padStart(2, '0')}`;
+  };
+
+  return (
+    <div className="flex flex-col items-center space-y-6 p-6">
+      <div className="text-center space-y-2">
+        <h1 className="text-[40px] font-bold text-white">Profile Puzzle</h1>
+        <div className="flex justify-center mb-2">
+          <TwitterLoginButton />
+        </div>
+        {gameState.isComplete ? (
+          <p className="text-lg text-white/70 flex items-center justify-center gap-2">
+            <span>🎉</span>
+            <span>You solved it in {gameState.moves} moves and {formatTime(currentTime)}!</span>
+          </p>
+        ) : (
+          <p className="text-lg text-white/40">Slide the tiles to play</p>
+        )}
+      </div>
+
+      <div className="flex flex-col items-center">
+        <div className="text-center">
+          <div className="flex gap-3 justify-center">
+            <button
+              onClick={shufflePuzzle}
+              disabled={gameState.isComplete}
+              className={`
+                cursor-pointer rounded-full text-md font-semibold text-white shadow-primary-button 
+                bg-[linear-gradient(90deg,#3ca3fc_3.81%,#2677c8_92.61%)] px-6 py-2 hover:opacity-90
+                disabled:opacity-50 disabled:cursor-not-allowed transition-all flex items-center gap-2
+              `}
+            >
+              <span className="text-lg">🎮</span>
+              <span className="hidden md:inline">{gameState.isShuffled ? 'Shuffle Again' : 'Start Game'}</span>
+              <span className="md:hidden">{gameState.isShuffled ? 'Shuffle' : 'Start'}</span>
+            </button>
+            
+            <button
+              onClick={resetPuzzle}
+              className="bg-white/10 text-white/80 px-6 py-2 rounded-full hover:bg-white/20 transition-colors flex items-center gap-2"
+            >
+              <span className="text-lg">🔄</span>
+              <span className="hidden md:inline">Reset Puzzle</span>
+              <span className="md:hidden">Reset</span>
+            </button>
+          </div>
+        </div>
+        
+        <PuzzleControls
+          moves={gameState.moves}
+          time={formatTime(currentTime)}
+          isComplete={gameState.isComplete}
+          isShuffled={gameState.isShuffled}
+          selectedSize={size}
+          onSizeChange={onSizeChange}
+          progress={progress}
+        />
+      </div>
+
+      <div 
+        ref={boardRef}
+        className="grid gap-1 bg-white/5 p-2 rounded-lg relative overflow-hidden w-full max-w-lg aspect-square touch-none"
+        style={{
+          gridTemplateColumns: `repeat(${size}, 1fr)`,
+        }}
+        onMouseMove={handleDragMove}
+        onMouseUp={handleDragEnd}
+        onMouseLeave={handleDragEnd}
+        onTouchMove={handleDragMove}
+        onTouchEnd={handleDragEnd}
+        onTouchCancel={handleDragEnd}
+      >
+        {Array.from({ length: size }).map((_, row) =>
+          Array.from({ length: size }).map((_, col) => {
+            if (emptyPosition.row === row && emptyPosition.col === col) {
+              if (gameState.isComplete) return null;
+              return (
+                <div
+                  key={`empty-${row}-${col}`}
+                  className={`border-2 border-dashed rounded-md flex items-center justify-center ${
+                    isDragging ? 'border-white/30 bg-white/5' : 'border-white/20 bg-white/5'
+                  }`}
+                  style={{ width: `${tileSize}px`, height: `${tileSize}px` }}
+                >
+                  <span className={`text-[10px] md:text-sm ${isDragging ? 'text-white/60' : 'text-white/40'}`}>
+                    {isDragging ? (
+                      <>
+                        <span className="hidden md:inline">Drop Here</span>
+                        <span className="md:hidden">Drop</span>
+                      </>
+                    ) : (
+                      <>
+                        <span className="hidden md:inline">Drop Zone</span>
+                        <span className="md:hidden">•••</span>
+                      </>
+                    )}
+                  </span>
+                </div>
+              );
+            }
+            const tile = gameState.tiles.find(
+              t => t.currentPosition.row === row && t.currentPosition.col === col
+            );
+            if (!tile) return null;
+
+            const isSourceOfDrag = isDragging && draggedTile?.id === tile.id;
+
+            return (
+              <PuzzleTile
+                key={tile.id}
+                tile={tile}
+                size={size}
+                tileSize={tileSize}
+                imageUrl={imageUrl}
+                onClick={() => moveTile(tile)}
+                onMouseDown={(e) => handleDragStart(e, tile)}
+                onTouchStart={(e) => handleDragStart(e, tile)}
+                isComplete={gameState.isComplete}
+                isDragging={false}
+                isSliding={slidingTiles.has(tile.id)}
+                isMovable={movableTiles.has(tile.id)}
+                dragPosition={null}
+                isSourceOfDrag={isSourceOfDrag}
+              />
+            );
+          })
+        )}
+        {isDragging && draggedTile && (
+          <PuzzleTile
+            key={`floating-${draggedTile.id}`}
+            tile={draggedTile}
+            size={size}
+            tileSize={tileSize}
+            imageUrl={imageUrl}
+            onClick={() => {}}
+            isComplete={gameState.isComplete}
+            isDragging={true}
+            isSliding={false}
+            isMovable={true}
+            dragPosition={dragPosition}
+          />
+        )}
+        
+        {/* Completion Overlay */}
+        <div
+          className={`absolute inset-2 z-10 bg-cover bg-center rounded-md transition-opacity duration-700 ease-in-out ${
+            gameState.isComplete ? 'opacity-100' : 'opacity-0 pointer-events-none'
+          }`}
+          style={{ backgroundImage: `url(${imageUrl})` }}
+        />
+      </div>
+
+    </div>
+  );
+};
+
+export default SlidingPuzzle; 

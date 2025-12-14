@@ -303,7 +303,7 @@ const SlidingPuzzle: React.FC<SlidingPuzzleProps> = ({ size, imageUrl, onSizeCha
   };
 
   return (
-    <div className="flex flex-col items-center space-y-6 p-6">
+    <div className="flex flex-col items-center space-y-6">
       <div className="text-center space-y-2">
         <h1 className="text-[40px] font-bold text-white">Profile Puzzle</h1>
         <div className="flex justify-center mb-2">

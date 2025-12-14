@@ -1,8 +1,11 @@
 'use client';
 
 import React, { useState, useEffect, useRef } from 'react';
+import Image from 'next/image';
 import { PuzzleSize } from '@/types/puzzle';
 import { useDynamicContext } from '@dynamic-labs/sdk-react-core';
+import type { OAuthCredential } from '@/types/dynamic';
+import { isOAuthCredential } from '@/types/dynamic';
 
 interface PuzzleControlsProps {
   moves: number;
@@ -182,8 +185,8 @@ const PuzzleControls: React.FC<PuzzleControlsProps> = ({
                     <div className="space-y-2 text-xs">
                       {(() => {
                         const twitterAccount = user.verifiedCredentials?.find(
-                          (cred: any) => cred.format === 'oauth' && cred.oauthProvider === 'twitter'
-                        ) as any;
+                          (cred) => isOAuthCredential(cred) && cred.oauthProvider === 'twitter'
+                        ) as OAuthCredential | undefined;
                         const profileImage = twitterAccount?.oauthAccountPhotos?.[0] || 
                                            twitterAccount?.oauthMetadata?.profile_image_url;
                         const username = twitterAccount?.oauthUsername || 
@@ -195,9 +198,11 @@ const PuzzleControls: React.FC<PuzzleControlsProps> = ({
                           <>
                             {profileImage && (
                               <div className="flex items-center gap-2">
-                                <img
+                                <Image
                                   src={profileImage}
                                   alt="Profile"
+                                  width={24}
+                                  height={24}
                                   className="w-6 h-6 rounded-full border border-gray-600"
                                 />
                                 <span className="text-gray-300">@{username || 'User'}</span>
@@ -358,8 +363,8 @@ const PuzzleControls: React.FC<PuzzleControlsProps> = ({
                       <div className="space-y-1 text-xs">
                           {(() => {
                           const twitterAccount = user.verifiedCredentials?.find(
-                            (cred: any) => cred.format === 'oauth' && cred.oauthProvider === 'twitter'
-                          ) as any;
+                            (cred) => isOAuthCredential(cred) && cred.oauthProvider === 'twitter'
+                          ) as OAuthCredential | undefined;
                           const profileImage = twitterAccount?.oauthAccountPhotos?.[0] || 
                                              twitterAccount?.oauthMetadata?.profile_image_url;
                           const username = twitterAccount?.oauthUsername || 
@@ -371,9 +376,11 @@ const PuzzleControls: React.FC<PuzzleControlsProps> = ({
                             <>
                               {profileImage && (
                                 <div className="flex items-center gap-2">
-                                  <img
+                                  <Image
                                     src={profileImage}
                                     alt="Profile"
+                                    width={20}
+                                    height={20}
                                     className="w-5 h-5 rounded-full border border-gray-600"
                                   />
                                   <span className="text-gray-300 text-xs">@{username || 'User'}</span>

@@ -1,10 +1,12 @@
 'use client';
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useMemo } from 'react';
 import { PuzzleSize } from '@/types/puzzle';
 import SlidingPuzzle from '@/components/SlidingPuzzle';
 import { getRandomPuzzleImage } from '@/utils/puzzleImages';
 import { useDynamicContext } from '@dynamic-labs/sdk-react-core';
+import type { OAuthCredential } from '@/types/dynamic';
+import { isOAuthCredential } from '@/types/dynamic';
 
 export default function Home() {
   const [selectedSize, setSelectedSize] = useState<PuzzleSize>(3);
@@ -13,11 +15,11 @@ export default function Home() {
   const selectedImage = useMemo(() => {
     if (user) {
       const twitterAccount = user.verifiedCredentials?.find(
-        (cred: any) => cred.format === 'oauth' && cred.oauthProvider === 'twitter'
-      );
+        (cred) => isOAuthCredential(cred) && cred.oauthProvider === 'twitter'
+      ) as OAuthCredential | undefined;
       
       const profileImage = twitterAccount?.oauthAccountPhotos?.[0] || 
-                          (twitterAccount?.oauthMetadata as any)?.profile_image_url;
+                          twitterAccount?.oauthMetadata?.profile_image_url;
       
       if (profileImage) {
         const largerImage = profileImage

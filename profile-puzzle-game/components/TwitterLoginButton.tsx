@@ -1,9 +1,12 @@
 'use client';
 
-import React, { useEffect } from 'react';
+import React from 'react';
+import Image from 'next/image';
 import { useDynamicContext } from '@dynamic-labs/sdk-react-core';
 import { useSocialAccounts } from '@dynamic-labs/sdk-react-core';
 import { ProviderEnum } from '@dynamic-labs/types';
+import type { OAuthCredential } from '@/types/dynamic';
+import { isOAuthCredential } from '@/types/dynamic';
 
 const TwitterLoginButton: React.FC = () => {
   const { user, handleLogOut } = useDynamicContext();
@@ -26,14 +29,13 @@ const TwitterLoginButton: React.FC = () => {
   // If user is logged in, show profile info
   if (user) {
     const twitterAccount = user.verifiedCredentials?.find(
-      (cred: any) => cred.format === 'oauth' && cred.oauthProvider === 'twitter'
-    );
+      (cred) => isOAuthCredential(cred) && cred.oauthProvider === 'twitter'
+    ) as OAuthCredential | undefined;
 
     const profileImage = twitterAccount?.oauthAccountPhotos?.[0] || 
-                        (twitterAccount?.oauthMetadata as any)?.profile_image_url || 
-                        (user as any).profileImageUrl;
+                        twitterAccount?.oauthMetadata?.profile_image_url;
     const username = twitterAccount?.oauthUsername || 
-                    (twitterAccount?.oauthMetadata as any)?.username || 
+                    twitterAccount?.oauthMetadata?.username || 
                     twitterAccount?.oauthDisplayName || 
                     user.username || 
                     'User';
@@ -41,9 +43,11 @@ const TwitterLoginButton: React.FC = () => {
     return (
       <div className="flex items-center gap-3">
         {profileImage && (
-          <img
+          <Image
             src={profileImage}
             alt="Profile"
+            width={32}
+            height={32}
             className="w-8 h-8 rounded-full border-2 border-white/20"
           />
         )}

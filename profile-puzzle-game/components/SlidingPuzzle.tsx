@@ -309,14 +309,15 @@ const SlidingPuzzle: React.FC<SlidingPuzzleProps> = ({ size, imageUrl, onSizeCha
         <div className="flex justify-center mb-2">
           <TwitterLoginButton />
         </div>
-        {gameState.isComplete ? (
-          <p className="text-lg text-white/70 flex items-center justify-center gap-2">
-            <span>🎉</span>
-            <span>You solved it in {gameState.moves} moves and {formatTime(currentTime)}!</span>
-          </p>
-        ) : (
-          <p className="text-lg text-white/40">Slide the tiles to play</p>
-        )}
+        <div className="min-h-14 flex items-center justify-center">
+          {gameState.isComplete ? (
+            <p className="text-lg text-white/70 flex flex-row items-center justify-center gap-2">
+              <span>🎉 You solved it in {gameState.moves} moves and {formatTime(currentTime)}!</span>
+            </p>
+          ) : (
+            <p className="text-lg text-white/40">Slide the tiles to play</p>
+          )}
+        </div>
       </div>
 
       <div className="flex flex-col items-center">

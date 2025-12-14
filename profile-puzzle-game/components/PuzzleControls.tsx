@@ -296,11 +296,6 @@ const PuzzleControls: React.FC<PuzzleControlsProps> = ({
             }}
           >
             <div className="w-12 h-1.5 bg-gray-700 rounded-full"></div>
-            <div className="absolute top-2 right-3 px-2 py-1 rounded-full bg-[#0a0a0a]/70 backdrop-blur-sm border border-gray-800/50">
-              <span className="text-xs font-medium text-[#3CA3FC]">
-                Built by christineRPM
-              </span>
-            </div>
           </div>
           
           {/* Mobile Dashboard Header */}

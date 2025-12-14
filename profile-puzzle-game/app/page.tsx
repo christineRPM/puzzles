@@ -38,7 +38,7 @@ export default function Home() {
   };
 
   return (
-    <main className="min-h-screen py-8">
+    <main className="min-h-screen">
       <SlidingPuzzle 
         size={selectedSize} 
         imageUrl={selectedImage}
